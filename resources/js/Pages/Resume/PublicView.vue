@@ -2,6 +2,7 @@
 import { Head } from '@inertiajs/vue3';
 import ResumePreview from '@/Components/ResumePreview.vue';
 import { useI18n } from 'vue-i18n';
+import { computed } from 'vue';
 
 const { t } = useI18n();
 
@@ -11,10 +12,30 @@ const props = defineProps({
 
 // Check if we are in PDF mode
 const isPdf = new URLSearchParams(window.location.search).get('pdf') === '1';
+
+// Dynamic SEO Data
+const pageTitle = computed(() => props.resume.fullname || `${props.resume.first_name} ${props.resume.last_name}'s Resume`);
+const pageDescription = computed(() => props.resume.summary || `View the professional resume of ${props.resume.first_name}. Powered by Civio.`);
+const pageImage = computed(() => '/og-resume-placeholder.png'); // Ideal: generate a dynamic image URL
 </script>
 
 <template>
-    <Head :title="resume.title" />
+    <Head>
+        <title>{{ pageTitle }}</title>
+        <meta name="description" :content="pageDescription" />
+
+        <!-- Open Graph / Facebook -->
+        <meta property="og:type" content="profile" />
+        <meta property="og:title" :content="pageTitle" />
+        <meta property="og:description" :content="pageDescription" />
+        <meta property="og:image" :content="pageImage" />
+
+        <!-- Twitter -->
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" :content="pageTitle" />
+        <meta name="twitter:description" :content="pageDescription" />
+        <meta name="twitter:image" :content="pageImage" />
+    </Head>
 
     <div :class="['min-h-screen flex flex-col items-center px-4 sm:px-6', isPdf ? 'bg-white p-0' : 'bg-slate-100 py-12']">
         <!-- Badge -->

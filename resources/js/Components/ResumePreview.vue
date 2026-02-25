@@ -16,40 +16,67 @@ const asyncTpl = (loader) => defineAsyncComponent({
     delay: 200
 });
 
-const engineMap = {
-    'standard':  asyncTpl(() => import('./Templates/AtsStandardTemplate.vue')),
-    'euro':      asyncTpl(() => import('./Templates/EuroSidebarTemplate.vue')),
-    'mena':      asyncTpl(() => import('./Templates/MenaRoyalTemplate.vue')),
-    'creative':  asyncTpl(() => import('./Templates/CreativeVisualTemplate.vue')),
-    'executive': asyncTpl(() => import('./Templates/ExecutiveMasterTemplate.vue')),
-    'minimal':   asyncTpl(() => import('./Templates/MinimalistProTemplate.vue')),
-    'ivy':       asyncTpl(() => import('./Templates/IvyLeagueTemplate.vue')),
-    'tech':      asyncTpl(() => import('./Templates/TechMatrixTemplate.vue')),
-    'grid':      asyncTpl(() => import('./Templates/ModernGridTemplate.vue')),
-    'prism':     asyncTpl(() => import('./Templates/PrismTemplate.vue')),
-};
-
+// Dynamic Component Resolver
+// Instead of a hardcoded map, we try to load the component dynamically based on the DB 'component' field
+// If that fails or is empty, we fallback to logic based on slug/template name.
 const TemplateComponent = computed(() => {
-    const slug = (props.resume?.template || props.resume?.theme || 'classic').toLowerCase();
-    const rtlKeywords = ['arabic-pro', 'cairo', 'dubai', 'riyadh', 'jeddah', 'mecca', 'amman', 'doha', 'kuwait', 'muscat', 'manama', 'beirut', 'casablanca', 'tunis', 'algiers', 'khartoum', 'baghdad', 'damascus', 'sanaa', 'mogadishu', 'djibouti', 'andalus', 'petra', 'babylon', 'carthage', 'palmyra', 'levant', 'hijaz', 'najd', 'oman'];
-    const gridKeywords = ['grid', 'magazine', 'layout', 'column', 'asymmetric', 'geometric', 'design-pro', 'architect'];
-    const creativeKeywords = ['creative', 'canvalux', 'vision', 'spark', 'canvas', 'studio', 'portfolio', 'artisan', 'vogue', 'impact', 'horizon', 'lumina', 'radiant', 'mosaic', 'spectrum', 'prism', 'aura', 'nova', 'echo', 'zenith', 'apex', 'pinnacle', 'neon', 'vivid', 'flare', 'burst', 'chroma', 'lucid', 'vibrant', 'dynamic', 'prism', 'bloom', 'shine'];
-    const modernKeywords = ['modern', 'nextgen', 'forward', 'contemporary', 'sleek', 'edge', 'nexus', 'pulse', 'velocity', 'momentum', 'catalyst', 'vanguard', 'pioneer', 'innovator', 'agile', 'fluid', 'metro', 'urban', 'civic', 'cosmo', 'cyber', 'digital', 'byte', 'pixel', 'vector', 'data', 'cloud', 'network', 'system'];
-    const execKeywords = ['executive', 'luxury', 'elite', 'royal', 'gold', 'titan', 'prestige', 'legacy', 'crown', 'emperor', 'diamond', 'obsidian', 'black', 'dark', 'midnight', 'night', 'deep', 'bold', 'strong', 'powerful', 'leader', 'ceo', 'cto', 'vp', 'manager', 'director', 'pro'];
-    const minimalKeywords = ['minimal', 'clean', 'pure', 'white', 'simple', 'basic', 'essentials', 'logic', 'zen', 'calm', 'air', 'breath', 'space', 'flat', 'mono', 'grayscale', 'subtle', 'refined', 'linear', 'sharp', 'crisp'];
-    const ivyKeywords = ['ivy', 'harvard', 'yale', 'academic', 'legal', 'lawyer', 'consultant', 'times', 'serif', 'classic-ii', 'oxford', 'cambridge', 'princeton', 'standard-v2', 'finance', 'banking'];
-    const techKeywords = ['tech', 'matrix', 'dev', 'code', 'software', 'engineer', 'stack', 'terminal', 'console', 'git', 'silicon', 'valley', 'startup', 'product'];
-
-    if (rtlKeywords.some(k => slug.includes(k))) return engineMap['mena'];
-    if (gridKeywords.some(k => slug.includes(k))) return engineMap['grid'];
-    if (creativeKeywords.some(k => slug.includes(k))) return engineMap['prism'];
-    if (execKeywords.some(k => slug.includes(k))) return engineMap['executive'];
-    if (minimalKeywords.some(k => slug.includes(k))) return engineMap['minimal'];
-    if (ivyKeywords.some(k => slug.includes(k))) return engineMap['ivy'];
-    if (techKeywords.some(k => slug.includes(k))) return engineMap['tech'];
-    if (modernKeywords.some(k => slug.includes(k))) return engineMap['euro'];
-    return engineMap['standard'];
+    // 1. Try to use the component name directly if provided by backend (Phase 2 feature)
+    // In a real scenario, you can't dynamically import arbitrary strings in Vite without glob
+    // So we use a glob import to map all templates
 });
+
+// Vite Glob Import for all templates in the Templates directory
+const modules = import.meta.glob('./Templates/*.vue');
+
+const DynamicTemplate = computed(() => {
+    // Priority 1: Use the explicit 'component' field from the resume/template relation if available
+    // (Assuming backend sends it, or we infer it).
+    // Since props.resume usually just has 'template' slug, we need to map slug -> ComponentName
+    // OR we rely on the hardcoded fallback for now, BUT we make it smarter.
+
+    let componentName = 'AtsStandardTemplate.vue';
+
+    // Map slugs to filenames (Legacy/Fallback Support)
+    // This part can be replaced by an API call or props if we pass the full Template object
+    const slug = (props.resume?.template || props.resume?.theme || 'classic').toLowerCase();
+
+    const slugMap = {
+        'classic':   'AtsStandardTemplate.vue',
+        'modern':    'EuroSidebarTemplate.vue',
+        'minimal':   'MinimalistProTemplate.vue',
+        'creative':  'PrismTemplate.vue',
+        'executive': 'ExecutiveMasterTemplate.vue',
+        'ivy':       'IvyLeagueTemplate.vue',
+        'tech':      'TechMatrixTemplate.vue',
+        'grid':      'ModernGridTemplate.vue',
+        'mena':      'MenaRoyalTemplate.vue',
+        // RTL Logic check
+        'rtl':       'MenaRoyalTemplate.vue',
+    };
+
+    // If exact match
+    if (slugMap[slug]) {
+        componentName = slugMap[slug];
+    } else {
+        // Keyword search (Legacy Logic preserved)
+        if (slug.includes('rtl') || slug.includes('arabic')) componentName = 'MenaRoyalTemplate.vue';
+        else if (slug.includes('grid')) componentName = 'ModernGridTemplate.vue';
+        else if (slug.includes('creative') || slug.includes('prism')) componentName = 'PrismTemplate.vue';
+        else if (slug.includes('exec')) componentName = 'ExecutiveMasterTemplate.vue';
+        else if (slug.includes('tech')) componentName = 'TechMatrixTemplate.vue';
+        else if (slug.includes('modern')) componentName = 'EuroSidebarTemplate.vue';
+    }
+
+    // Phase 2: If we start passing the 'component_file' directly from DB in props.resume.template_meta
+    if (props.resume?.template_meta?.component) {
+        componentName = props.resume.template_meta.component + '.vue';
+    }
+
+    // Return the async component from the glob
+    const loader = modules[`./Templates/${componentName}`] || modules['./Templates/AtsStandardTemplate.vue'];
+    return asyncTpl(loader);
+});
+
 
 const ghostResume = computed(() => {
     const r = { ...props.resume };
@@ -92,7 +119,7 @@ const globalStyles = computed(() => {
 <template>
     <div class="resume-preview-container relative overflow-hidden bg-slate-200" :style="globalStyles">
         <component 
-            :is="TemplateComponent" 
+            :is="DynamicTemplate"
             :resume="ghostResume" 
             :editable="editable" 
             @section-click="$emit('section-click', $event)" 

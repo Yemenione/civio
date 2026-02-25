@@ -133,6 +133,9 @@ Route::middleware('auth')->group(function () {
     Route::patch('/resumes/{resume}/share/regenerate', [PublicResumeController::class, 'regenerateToken'])->name('resumes.share.regenerate');
 });
 
+// Internal PDF View (Signed URL)
+Route::get('/resumes/{resume}/pdf-view', [ResumeController::class, 'pdfView'])->name('resumes.pdf-view');
+
 // Public Share View
 Route::get('/share/{token}', [PublicResumeController::class, 'show'])->name('resumes.show');
 
@@ -143,39 +146,39 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/analytics', [AdminController::class, 'analytics'])->name('analytics');
 
     // Users
-    Route::get('/users', [AdminController::class, 'users'])->name('users.index');
-    Route::delete('/users/{user}', [AdminController::class, 'destroyUser'])->name('users.destroy');
-    Route::put('/users/{user}/role', [AdminController::class, 'toggleRole'])->name('users.toggleRole');
-    Route::put('/users/{user}/active', [AdminController::class, 'toggleActive'])->name('users.toggleActive');
-    Route::put('/users/{user}/plan', [AdminController::class, 'changePlan'])->name('users.changePlan');
+    Route::get('/users', [\App\Http\Controllers\Admin\UserController::class, 'index'])->name('users.index');
+    Route::delete('/users/{user}', [\App\Http\Controllers\Admin\UserController::class, 'destroy'])->name('users.destroy');
+    Route::put('/users/{user}/role', [\App\Http\Controllers\Admin\UserController::class, 'toggleRole'])->name('users.toggleRole');
+    Route::put('/users/{user}/active', [\App\Http\Controllers\Admin\UserController::class, 'toggleActive'])->name('users.toggleActive');
+    Route::put('/users/{user}/plan', [\App\Http\Controllers\Admin\UserController::class, 'changePlan'])->name('users.changePlan');
 
     // Subscriptions
-    Route::get('/subscriptions', [AdminController::class, 'subscriptions'])->name('subscriptions.index');
-    Route::patch('/subscriptions/{user}/extend', [AdminController::class, 'extendSubscription'])->name('subscriptions.extend');
-    Route::delete('/subscriptions/{user}/cancel', [AdminController::class, 'cancelSubscription'])->name('subscriptions.cancel');
+    Route::get('/subscriptions', [\App\Http\Controllers\Admin\SubscriptionController::class, 'index'])->name('subscriptions.index');
+    Route::patch('/subscriptions/{user}/extend', [\App\Http\Controllers\Admin\SubscriptionController::class, 'extend'])->name('subscriptions.extend');
+    Route::delete('/subscriptions/{user}/cancel', [\App\Http\Controllers\Admin\SubscriptionController::class, 'cancel'])->name('subscriptions.cancel');
 
     // Payments
-    Route::get('/payments', [AdminController::class, 'payments'])->name('payments.index');
-    Route::patch('/payments/{payment}/refund', [AdminController::class, 'refundPayment'])->name('payments.refund');
-    Route::get('/payments/export', [AdminController::class, 'exportPaymentsCsv'])->name('payments.export');
+    Route::get('/payments', [\App\Http\Controllers\Admin\PaymentController::class, 'index'])->name('payments.index');
+    Route::patch('/payments/{payment}/refund', [\App\Http\Controllers\Admin\PaymentController::class, 'refund'])->name('payments.refund');
+    Route::get('/payments/export', [\App\Http\Controllers\Admin\PaymentController::class, 'export'])->name('payments.export');
 
     // Templates
-    Route::get('/templates', [AdminController::class, 'templates'])->name('templates.index');
-    Route::post('/templates', [AdminController::class, 'storeTemplate'])->name('templates.store');
-    Route::put('/templates/{template}', [AdminController::class, 'updateTemplate'])->name('templates.update');
-    Route::delete('/templates/{template}', [AdminController::class, 'destroyTemplate'])->name('templates.destroy');
-    Route::patch('/templates/{template}/toggle', [AdminController::class, 'toggleTemplateActive'])->name('templates.toggle');
+    Route::get('/templates', [\App\Http\Controllers\Admin\TemplateController::class, 'index'])->name('templates.index');
+    Route::post('/templates', [\App\Http\Controllers\Admin\TemplateController::class, 'store'])->name('templates.store');
+    Route::put('/templates/{template}', [\App\Http\Controllers\Admin\TemplateController::class, 'update'])->name('templates.update');
+    Route::delete('/templates/{template}', [\App\Http\Controllers\Admin\TemplateController::class, 'destroy'])->name('templates.destroy');
+    Route::patch('/templates/{template}/toggle', [\App\Http\Controllers\Admin\TemplateController::class, 'toggle'])->name('templates.toggle');
 
     // Settings
-    Route::get('/settings', [AdminController::class, 'settings'])->name('settings.index');
-    Route::patch('/settings/ai', [AdminController::class, 'updateAiSettings'])->name('settings.ai.update');
-    Route::patch('/settings/google', [AdminController::class, 'updateGoogleSettings'])->name('settings.google.update');
-    Route::patch('/settings/stripe', [AdminController::class, 'updateStripeSettings'])->name('settings.stripe.update');
+    Route::get('/settings', [\App\Http\Controllers\Admin\SettingsController::class, 'index'])->name('settings.index');
+    Route::patch('/settings/ai', [\App\Http\Controllers\Admin\SettingsController::class, 'updateAi'])->name('settings.ai.update');
+    Route::patch('/settings/google', [\App\Http\Controllers\Admin\SettingsController::class, 'updateGoogle'])->name('settings.google.update');
+    Route::patch('/settings/stripe', [\App\Http\Controllers\Admin\SettingsController::class, 'updateStripe'])->name('settings.stripe.update');
 
     // Coupons
-    Route::get('/coupons', [AdminController::class, 'coupons'])->name('coupons.index');
-    Route::post('/coupons', [AdminController::class, 'storeCoupon'])->name('coupons.store');
-    Route::delete('/coupons/{coupon}', [AdminController::class, 'destroyCoupon'])->name('coupons.destroy');
+    Route::get('/coupons', [\App\Http\Controllers\Admin\SubscriptionController::class, 'coupons'])->name('coupons.index');
+    Route::post('/coupons', [\App\Http\Controllers\Admin\SubscriptionController::class, 'storeCoupon'])->name('coupons.store');
+    Route::delete('/coupons/{coupon}', [\App\Http\Controllers\Admin\SubscriptionController::class, 'destroyCoupon'])->name('coupons.destroy');
 
     // Plans Management (Phase 9)
     Route::get('/plans', [AdminController::class, 'plans'])->name('plans.index');
@@ -185,13 +188,13 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::patch('/plans/{plan}/toggle', [AdminController::class, 'togglePlanActive'])->name('plans.toggle');
 
     // User Impersonation (Phase 9)
-    Route::post('/users/{user}/impersonate', [AdminController::class, 'impersonate'])->name('users.impersonate');
-    Route::post('/impersonate/leave', [AdminController::class, 'leaveImpersonation'])->name('impersonate.leave');
+    Route::post('/users/{user}/impersonate', [\App\Http\Controllers\Admin\UserController::class, 'impersonate'])->name('users.impersonate');
+    Route::post('/impersonate/leave', [\App\Http\Controllers\Admin\UserController::class, 'leaveImpersonation'])->name('impersonate.leave');
 
     // SEO & Content (Phase 11)
     Route::get('/seo', [AdminController::class, 'seo'])->name('seo.index');
     Route::post('/seo', [AdminController::class, 'updateSeo'])->name('seo.update');
-    Route::post('/settings/identity', [AdminController::class, 'updateIdentity'])->name('settings.identity.update');
+    Route::post('/settings/identity', [\App\Http\Controllers\Admin\SettingsController::class, 'updateIdentity'])->name('settings.identity.update');
 
     // AI Operations (Phase 12)
     Route::get('/ai-ops', [AdminController::class, 'aiOps'])->name('ai-ops.index');
