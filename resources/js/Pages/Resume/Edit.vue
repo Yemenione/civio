@@ -16,39 +16,27 @@ import FloatingIsland from '@/Components/FloatingIsland.vue';
 import AuraRing from '@/Components/AuraRing.vue';
 import PolisherInline from '@/Components/PolisherInline.vue';
 import TemplateSelector from './Partials/TemplateSelector.vue';
+import axios from 'axios';
 
 const props = defineProps(['resume', 'templates']);
 const { t } = useI18n();
 
-// Template picker
+// ... (existing code for template picker, theme change, tabs, etc. remains unchanged) ...
 const availableTemplates = [
-    // Standard / ATS
     { id: 'classic',        label: 'Classic ATS',    color: '#334155', textColor: '#f8fafc' },
     { id: 'modern',         label: 'Modern Euro',    color: '#4f46e5', textColor: '#ffffff' },
-    
-    // Ivy League (Academic/Legal)
     { id: 'harvard',        label: 'Harvard Legacy', color: '#000000', textColor: '#ffffff' },
     { id: 'yale-legal',     label: 'Yale Legal',     color: '#1e3a8a', textColor: '#bfdbfe' },
     { id: 'oxford',         label: 'Oxford Academic',color: '#7f1d1d', textColor: '#fecaca' },
-
-    // Tech / Startup
     { id: 'silicon-valley', label: 'Silicon Valley', color: '#0f172a', textColor: '#38bdf8' },
     { id: 'matrix-dev',     label: 'Matrix Dev',     color: '#022c22', textColor: '#4ade80' },
     { id: 'startup-hero',   label: 'Startup Hero',   color: '#4c1d95', textColor: '#f5d0fe' },
-
-    // Executive / Luxury
     { id: 'executive-gold', label: 'CEO Suite',      color: '#1e293b', textColor: '#fbbf24' },
     { id: 'obsidian-elite', label: 'Obsidian Elite', color: '#000000', textColor: '#94a3b8' },
-    
-    // Minimalist / Design
     { id: 'swiss-design',   label: 'Swiss Design',   color: '#ffffff', textColor: '#0f172a' },
     { id: 'pure-zen',       label: 'Pure Zen',       color: '#f8fafc', textColor: '#475569' },
-    
-    // Creative
     { id: 'creative-spark', label: 'Creative Spark', color: '#db2777', textColor: '#ffffff' },
     { id: 'vogue-fashion',  label: 'Vogue Fashion',  color: '#be185d', textColor: '#fff1f2' },
-    
-    // Regional
     { id: 'arabic-pro',     label: 'Arabic Royal',   color: '#065f46', textColor: '#a7f3d0' },
 ];
 
@@ -56,10 +44,8 @@ const currentTheme = ref(props.resume.theme || 'classic');
 
 const changeTheme = (themeId) => {
     currentTheme.value = themeId;
-    // Reactively update the resume object so preview updates instantly
     props.resume.theme = themeId;
     props.resume.template = themeId;
-    // Persist to database
     router.patch(route('resumes.update', props.resume.id), { 
         theme: themeId, 
         template: themeId 
@@ -79,11 +65,15 @@ const tabs = [
     { id: 'skills',         label: 'skills',            icon: 'M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z' },
     { id: 'projects',       label: 'projects',          icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' },
     { id: 'languages',      label: 'languages',         icon: 'M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129' },
-    { id: 'certifications', label: 'certifications',    icon: 'M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z' },
+    { id: 'certifications', label: 'certifications',    icon: 'M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138z' },
 ];
 
 const mode = ref('tab');
 const zoomScale = ref(1);
+const showLeftSidebar = ref(true);
+const showRightSidebar = ref(false);
+
+const isDownloading = ref(false); // UX Improvement
 
 import { watch } from 'vue';
 watch(mode, (newMode) => {
@@ -119,33 +109,24 @@ const tabProgress = () => {
 const completionPercentage = computed(() => {
     let score = 0;
     const r = props.resume;
-    
-    // Personal Details (40%)
     if (r.first_name) score += 5;
     if (r.last_name)  score += 5;
     if (r.email)      score += 5;
     if (r.phone)      score += 5;
     if (r.job_title)  score += 10;
     if (r.summary)    score += 10;
-    
-    // Core Sections (40%)
     if (r.experiences?.length) score += 15;
     if (r.education?.length)   score += 15;
     if (r.skills?.length)      score += 10;
-    
-    // Others (20%)
     if (r.projects?.length)       score += 10;
     if (r.languages?.length)      score += 5;
     if (r.certifications?.length) score += 5;
-    
     return Math.min(score, 100);
 });
 
 const missingElements = computed(() => {
     const missing = [];
     const r = props.resume;
-
-    // Personal Details
     let personalMissing = 0;
     if (!r.first_name) personalMissing += 5;
     if (!r.last_name) personalMissing += 5;
@@ -153,19 +134,13 @@ const missingElements = computed(() => {
     if (!r.phone) personalMissing += 5;
     if (!r.job_title) personalMissing += 10;
     if (personalMissing > 0) missing.push({ id: 'personal', labelKey: 'personal_details', points: personalMissing });
-    
     if (!r.summary) missing.push({ id: 'personal', labelKey: 'summary', points: 10 });
-    
-    // Core Sections
     if (!r.experiences?.length) missing.push({ id: 'experience', labelKey: 'experience', points: 15 });
     if (!r.education?.length)   missing.push({ id: 'education', labelKey: 'education', points: 15 });
     if (!r.skills?.length)      missing.push({ id: 'skills', labelKey: 'skills', points: 10 });
-    
-    // Others
     if (!r.projects?.length)       missing.push({ id: 'projects', labelKey: 'projects', points: 10 });
     if (!r.languages?.length)      missing.push({ id: 'languages', labelKey: 'languages', points: 5 });
     if (!r.certifications?.length) missing.push({ id: 'certifications', labelKey: 'certifications', points: 5 });
-
     return missing;
 });
 
@@ -178,11 +153,39 @@ const filteredTabs = computed(() => {
     );
 });
 
-const downloadPdf = () => {
-    window.open(route('resumes.print', props.resume.id), '_blank');
+// Improved Download Logic with Loading State
+const downloadPdf = async () => {
+    if (isDownloading.value) return;
+
+    isDownloading.value = true;
+
+    try {
+        // We use window.open for now because the backend returns a download stream
+        // To handle loading state properly with a file download, we can use a token approach or just a timeout
+        // But a cleaner way for UX is to use axios to get the blob, then download it
+
+        const response = await axios.get(route('resumes.download', props.resume.id), {
+            responseType: 'blob'
+        });
+
+        // Create a link element
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `${props.resume.title || 'resume'}.pdf`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+
+    } catch (error) {
+        console.error('Download failed', error);
+        alert(t('download_failed') || 'Could not generate PDF. Please try again.');
+    } finally {
+        isDownloading.value = false;
+    }
 };
 
-// Responsive handling
 const isMobile = ref(false);
 const checkMobile = () => {
     isMobile.value = window.innerWidth < 1024;
@@ -193,27 +196,19 @@ if (typeof window !== 'undefined') {
     window.addEventListener('resize', checkMobile);
 }
 
-const showLeftSidebar = ref(true);
-const showRightSidebar = ref(false);
-
 const handleSectionClick = (section) => {
-    // Open the corresponding section in the left sidebar
     activeTab.value = section;
     if (!showLeftSidebar.value) showLeftSidebar.value = true;
 };
 
-// Inline Text Editing Handler
 const handleInlineEdit = (section, field, id, value) => {
-    // Basic sanitizer
     const sanitizedValue = value.replace(/&nbsp;/g, ' ').trim();
-    
     if (section === 'personal') {
         props.resume[field] = sanitizedValue;
         router.patch(route('resumes.update', props.resume.id), {
             [field]: sanitizedValue
         }, { preserveScroll: true, preserveState: true });
     } else {
-        // Find item in array
         const list = props.resume[section];
         if (!list) return;
         const item = list.find(i => i.id === id);
@@ -226,7 +221,6 @@ const handleInlineEdit = (section, field, id, value) => {
     }
 };
 
-// Device Preview Styles
 const previewDeviceStyles = computed(() => {
     return `max-w-[210mm] transition-all duration-500 ease-in-out transform origin-top`;
 });
@@ -261,7 +255,6 @@ const handleApplySuggestion = ({ section, id, suggestion }) => {
             }, { preserveScroll: true, preserveState: true });
         }
     } else if (section === 'skills') {
-        // Handle skills text or array
         if (typeof props.resume.skills === 'string') {
             props.resume.skills = suggestion;
         } else {
@@ -278,11 +271,37 @@ const handleApplySuggestion = ({ section, id, suggestion }) => {
 <template>
     <Head :title="t('edit')" />
 
+    <!-- Loading Modal -->
+    <Transition
+        enter-active-class="transition duration-200 ease-out"
+        enter-from-class="opacity-0 scale-95"
+        enter-to-class="opacity-100 scale-100"
+        leave-active-class="transition duration-150 ease-in"
+        leave-from-class="opacity-100 scale-100"
+        leave-to-class="opacity-0 scale-95"
+    >
+        <div v-if="isDownloading" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div class="bg-white dark:bg-slate-900 rounded-2xl p-8 flex flex-col items-center max-w-sm w-full shadow-2xl border border-white/10">
+                <div class="relative w-16 h-16 mb-6">
+                    <div class="absolute inset-0 border-4 border-slate-200 dark:border-slate-800 rounded-full"></div>
+                    <div class="absolute inset-0 border-4 border-indigo-500 rounded-full border-t-transparent animate-spin"></div>
+                    <svg class="absolute inset-0 m-auto w-6 h-6 text-indigo-500 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                </div>
+                <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2">{{ t('generating_pdf') || 'Preparing PDF...' }}</h3>
+                <p class="text-slate-500 text-center text-sm">
+                    {{ t('please_wait_pdf') || 'Please wait while we generate a high-quality PDF for you. This may take a few seconds.' }}
+                </p>
+            </div>
+        </div>
+    </Transition>
+
     <AuthenticatedLayout :fluid="true">
+        <!-- ... (existing layout code remains unchanged) ... -->
         <template #header>
             <div class="flex justify-between items-center px-1 sm:px-4">
                 <div class="flex items-center gap-2 sm:gap-6 min-w-0 pr-2">
-                    <!-- Integrated Sidebar Toggle -->
                     <button 
                         @click="showLeftSidebar = !showLeftSidebar"
                         class="p-2 rounded-xl bg-slate-100 dark:bg-white/5 border border-black/5 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-white transition-all shadow-sm"
@@ -305,7 +324,6 @@ const handleApplySuggestion = ({ section, id, suggestion }) => {
                 </div>
                 
                 <div class="flex items-center gap-1.5 sm:gap-4 shrink-0">
-                    <!-- Design Mode Switcher (Repositioned) -->
                     <button 
                         @click="mode = (mode === 'design' ? 'tab' : 'design')"
                         :class="[
@@ -324,7 +342,6 @@ const handleApplySuggestion = ({ section, id, suggestion }) => {
                     <div class="hidden sm:block w-px h-6 sm:h-8 bg-black/5 dark:bg-white/5 mx-1 sm:mx-2 shrink-0"></div>
 
                     <div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
-                        <!-- Combined Smart Audit Button -->
                         <button @click="handleAiOptimize" class="bg-indigo-600/10 hover:bg-indigo-600/20 border border-indigo-500/20 text-indigo-400 px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 shrink-0 group" title="Smart Audit & ATS">
                             <div class="relative">
                                 <svg class="w-4 h-4 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>
@@ -332,20 +349,35 @@ const handleApplySuggestion = ({ section, id, suggestion }) => {
                             <span class="hidden md:inline text-[10px] font-black uppercase tracking-widest">{{ t('smart_audit') || 'Smart Audit' }}</span>
                         </button>
                         
-                        <!-- Download Button -->
-                        <button @click="downloadPdf" class="bg-white text-black hover:bg-slate-200 p-1.5 sm:px-6 sm:py-2.5 rounded-lg sm:rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95 shadow-xl shrink-0" :title="t('download')">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <!-- Download Button with Loading State -->
+                        <button
+                            @click="downloadPdf"
+                            :disabled="isDownloading"
+                            :class="[
+                                'bg-white text-black hover:bg-slate-200 p-1.5 sm:px-6 sm:py-2.5 rounded-lg sm:rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95 shadow-xl shrink-0',
+                                isDownloading ? 'opacity-70 cursor-not-allowed' : ''
+                            ]"
+                            :title="t('download')"
+                        >
+                            <svg v-if="!isDownloading" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                             </svg>
-                            <span class="hidden sm:inline text-[10px] font-black uppercase tracking-widest">{{ t('download') }}</span>
+                            <svg v-else class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span class="hidden sm:inline text-[10px] font-black uppercase tracking-widest">
+                                {{ isDownloading ? (t('generating') || 'Generating...') : t('download') }}
+                            </span>
                         </button>
                     </div>
                 </div>
             </div>
         </template>
 
+        <!-- ... (Rest of the template structure with Sidebar and Preview Area) ... -->
         <div class="flex flex-col lg:flex-row h-[calc(100vh-180px)] overflow-hidden bg-slate-50 dark:bg-slate-950 p-2 lg:p-4 gap-4 relative">
-            <!-- Sidebar -->
+             <!-- Sidebar -->
             <Transition
                 enter-active-class="transition-all duration-500 ease-out"
                 leave-active-class="transition-all duration-500 ease-in"
@@ -510,10 +542,6 @@ const handleApplySuggestion = ({ section, id, suggestion }) => {
                     <FloatingIsland v-if="mode === 'design' && !showRightSidebar" :resume="resume" @ai-optimize="handleAiOptimize" />
                 </Transition>
                 
-                <!-- AI Polisher Inline (Integrated) -->
-
-                <!-- Contextual Edit Popover Removed as per user request -->
-
                 <div class="flex-1 overflow-y-auto p-4 lg:p-12 flex justify-center relative bg-[radial-gradient(circle_at_center,_var(--tw-gradient-from)_0%,_transparent_70%)] from-indigo-500/5 transition-all duration-700">
                     <!-- Device Shell Simulation -->
                     <div 

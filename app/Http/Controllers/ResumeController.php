@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 
 class ResumeController extends Controller
@@ -337,27 +338,22 @@ class ResumeController extends Controller
             abort(403);
         }
 
-        // Ensure share token exists for the script to access
-        if (!$resume->share_token) {
-            $resume->update(['share_token' => Str::random(48)]);
-        }
+        // Generate a signed URL for the puppeteer script to access the resume
+        // This URL will be valid for 5 minutes and grants temporary access
+        $signedUrl = URL::temporarySignedRoute(
+            'resumes.pdf-view',
+            now()->addMinutes(5),
+            ['resume' => $resume->id]
+        );
 
-        // Temporary enable public if not already (or just use the token regardless of is_public for the script)
-        // Note: Our PublicResumeController@show checks is_public=true. 
-        // For security, we'll use a specific route or just toggle is_public temporarily.
-        $wasPublic = $resume->is_public;
-        if (!$wasPublic) {
-            $resume->update(['is_public' => true]);
-        }
-
-        $url = route('resumes.show', ['token' => $resume->share_token]) . '?pdf=1';
-        // If running locally with artisan serve, we might need to ensure the host is correct
-        // But route() should handle it based on APP_URL.
+        // Append pdf=1 to trigger PDF mode in Vue
+        $url = $signedUrl . '&pdf=1';
 
         $tempPath = storage_path('app/public/resume-' . $resume->id . '.pdf');
         $scriptPath = base_path('scripts/pdf.js');
         
         // Command to run node script
+        // Note: You might need to adjust this command if 'node' is not in PATH or using specific version
         $command = "node \"$scriptPath\" \"$url\" \"$tempPath\"";
         
         try {
@@ -368,20 +364,25 @@ class ResumeController extends Controller
                 throw new \Exception('Node script failed with exit code ' . $returnCode);
             }
 
-            // Restore public status
-            if (!$wasPublic) {
-                $resume->update(['is_public' => false]);
-            }
-
             return response()->download($tempPath)->deleteFileAfterSend(true);
         } catch (\Exception $e) {
-            // Restore public status on error
-            if (!$wasPublic) {
-                $resume->update(['is_public' => false]);
-            }
             Log::error('PDF Generation Exception: ' . $e->getMessage());
             return back()->with('error', 'Could not generate high-quality PDF. ' . $e->getMessage());
         }
+    }
+
+    // Internal route for PDF generator (Puppeteer) to access resume securely
+    public function pdfView(Request $request, Resume $resume)
+    {
+        if (!$request->hasValidSignature()) {
+            abort(403);
+        }
+
+        $resume->load(['experiences', 'education', 'skills', 'projects', 'languages', 'certifications']);
+
+        return Inertia::render('Resume/PublicView', [
+            'resume' => $resume,
+        ]);
     }
 
     public function print(Resume $resume)
